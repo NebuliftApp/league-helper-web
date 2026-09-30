@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Avatar, Callout, EmptyState, Icon, PageHeader, Section } from '../components/ui.tsx'
 import { useAuth } from '../lib/auth.tsx'
 import { supabase } from '../lib/supabase.ts'
 import type { CoachingSession, Invite, Member, Note } from '../lib/types.ts'
@@ -61,17 +62,14 @@ export default function SessionDetail() {
     await supabase.from('session_notes').update({ done: !n.done }).eq('id', n.id)
     await load()
   }
-
   async function removeNote(n: Note) {
     await supabase.from('session_notes').delete().eq('id', n.id)
     await load()
   }
-
   async function cancelInvite(i: Invite) {
     await supabase.from('session_invites').delete().eq('id', i.id)
     await load()
   }
-
   async function leaveOrDelete() {
     const isOwner = session?.owner_id === profile?.id
     if (!confirm(isOwner ? 'Delete this session for everyone?' : 'Leave this session?')) return
@@ -80,67 +78,88 @@ export default function SessionDetail() {
     navigate('/')
   }
 
-  if (session === undefined) return <p className="muted">Loading…</p>
-  if (session === null) return <p>Session not found. <Link to="/">Back</Link></p>
+  if (session === undefined) return <p className="sub">Loading…</p>
+  if (session === null) return <EmptyState title="Session not found" hint="It may have been deleted, or you're not a member." />
 
   const isOwner = session.owner_id === profile?.id
+  const back = <Link to="/" className="back"><Icon name="back" size={16} />Sessions</Link>
+
   return (
-    <div className="narrow-block">
-      <p><Link to="/">← Sessions</Link></p>
-      <h1>{session.title}</h1>
-      {error && <p className="error" role="alert">{error}</p>}
+    <>
+      <PageHeader title={session.title} back={back} subtitle={`${members.length} ${members.length === 1 ? 'person' : 'people'}`} />
+      {error && <Callout tone="error">{error}</Callout>}
 
-      <section>
-        <h2>People</h2>
-        <ul className="list">
-          {members.map((m) => (
-            <li key={m.user_id}>
-              <span>{m.profiles?.display_name || m.profiles?.username} <span className="muted">@{m.profiles?.username}</span></span>
-              <span className="muted">{m.role}</span>
-            </li>
-          ))}
+      <Section title="People">
+        <div className="group">
+          {members.map((m) => {
+            const n = m.profiles?.display_name || m.profiles?.username || '?'
+            return (
+              <div className="row" key={m.user_id}>
+                <Avatar name={n} />
+                <div className="row-main">
+                  <div className="row-title">{n}</div>
+                  <div className="row-meta">@{m.profiles?.username}</div>
+                </div>
+                <div className="end row-meta">{m.role}</div>
+              </div>
+            )
+          })}
           {invites.map((i) => (
-            <li key={i.id}>
-              <span>@{i.profiles?.username} <span className="muted">invited</span></span>
-              {i.invited_user_id && <button onClick={() => void cancelInvite(i)}>Cancel</button>}
-            </li>
+            <div className="row" key={i.id}>
+              <Avatar name={i.profiles?.username ?? '?'} />
+              <div className="row-main">
+                <div className="row-title">@{i.profiles?.username}</div>
+                <div className="row-meta">Invitation pending</div>
+              </div>
+              <div className="end"><button className="btn quiet" onClick={() => void cancelInvite(i)}>Cancel</button></div>
+            </div>
           ))}
-        </ul>
-        <form onSubmit={invite} className="row">
-          <input placeholder="Invite by username" value={username} onChange={(e) => setUsername(e.target.value)} required />
-          <button className="primary">Invite</button>
+        </div>
+        <form onSubmit={invite} className="actions">
+          <input className="grow" placeholder="Invite by username" autoCapitalize="none" value={username} onChange={(e) => setUsername(e.target.value)} required />
+          <button className="btn primary">Invite</button>
         </form>
-      </section>
+      </Section>
 
-      <section>
-        <h2>Notes &amp; goals</h2>
-        {notes.length === 0 && <p className="muted">Nothing here yet. Add the first note or goal below.</p>}
-        <ul className="list">
-          {notes.map((n) => (
-            <li key={n.id}>
-              <span className={n.done ? 'done' : ''}>
-                {n.kind === 'goal' && (
-                  <input type="checkbox" checked={n.done} onChange={() => void toggle(n)} aria-label="Goal done" />
-                )}{' '}
-                {n.body} <span className="muted">— {n.profiles?.username}</span>
-              </span>
-              {(n.author_id === profile?.id) && <button onClick={() => void removeNote(n)}>Delete</button>}
-            </li>
-          ))}
-        </ul>
-        <form onSubmit={addNote} className="stack">
-          <textarea placeholder="Write a note or goal" value={body} onChange={(e) => setBody(e.target.value)} rows={3} maxLength={5000} required />
-          <span className="row">
-            <select value={kind} onChange={(e) => setKind(e.target.value as 'note' | 'goal')}>
-              <option value="note">Note</option>
-              <option value="goal">Goal</option>
-            </select>
-            <button className="primary">Add</button>
-          </span>
+      <Section title="Notes and goals">
+        {notes.length === 0 ? (
+          <EmptyState title="Nothing here yet" hint="Add the first note or goal below. Everyone in the session sees it live." />
+        ) : (
+          <div className="group">
+            {notes.map((n) => {
+              const who = n.profiles?.username ?? '?'
+              return (
+                <div className="row" key={n.id} style={{ alignItems: 'flex-start' }}>
+                  {n.kind === 'goal'
+                    ? <input type="checkbox" checked={n.done} onChange={() => void toggle(n)} aria-label="Goal done" style={{ marginTop: 3 }} />
+                    : <Avatar name={who} />}
+                  <div className="row-main">
+                    <div className={`note-body ${n.done ? 'done' : ''}`}>{n.body}</div>
+                    <div className="row-meta">{n.kind === 'goal' ? 'Goal · ' : ''}@{who}</div>
+                  </div>
+                  {n.author_id === profile?.id && (
+                    <div className="end"><button className="btn quiet" onClick={() => void removeNote(n)}>Delete</button></div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+        <form onSubmit={addNote} className="form" style={{ marginTop: 12 }}>
+          <textarea placeholder={kind === 'goal' ? 'Write a goal' : 'Write a note'} value={body} onChange={(e) => setBody(e.target.value)} rows={3} maxLength={5000} required />
+          <div className="actions" style={{ marginTop: 0 }}>
+            <div className="seg" role="group" aria-label="Type">
+              <button type="button" aria-pressed={kind === 'note'} onClick={() => setKind('note')}>Note</button>
+              <button type="button" aria-pressed={kind === 'goal'} onClick={() => setKind('goal')}>Goal</button>
+            </div>
+            <button className="btn primary" style={{ marginLeft: 'auto' }}>Add</button>
+          </div>
         </form>
-      </section>
+      </Section>
 
-      <p><button onClick={() => void leaveOrDelete()}>{isOwner ? 'Delete session' : 'Leave session'}</button></p>
-    </div>
+      <div className="actions">
+        <button className="btn danger" onClick={() => void leaveOrDelete()}>{isOwner ? 'Delete session' : 'Leave session'}</button>
+      </div>
+    </>
   )
 }

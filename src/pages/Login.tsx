@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
+import { Callout } from '../components/ui.tsx'
 import { useAuth } from '../lib/auth.tsx'
 
 export default function Login() {
@@ -17,21 +18,21 @@ export default function Login() {
   }
 
   return (
-    <main className="narrow">
-      <h1>League Helper</h1>
-      <p className="muted">Sign in with the username your admin gave you. There's no sign-up.</p>
-      <form onSubmit={submit} className="stack">
-        <label>
-          Username
-          <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoFocus required />
-        </label>
-        <label>
-          Password
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
-        </label>
-        {error && <p className="error" role="alert">{error}</p>}
-        <button className="primary" disabled={busy}>Sign in</button>
-      </form>
-    </main>
+    <div className="auth">
+      <div className="auth-inner">
+        <h1>Sign in</h1>
+        <p className="sub">Use the username your admin gave you. There's no sign-up.</p>
+        {error && <Callout tone="error">{error}</Callout>}
+        <form onSubmit={submit} className="form">
+          <label className="field">Username
+            <input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" autoCapitalize="none" autoFocus required />
+          </label>
+          <label className="field">Password
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
+          </label>
+          <button className="btn primary wide" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+        </form>
+      </div>
+    </div>
   )
 }

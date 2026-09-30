@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
+import { Callout, Icon, PageHeader, RoleChip, Section } from '../components/ui.tsx'
 import { supabase } from '../lib/supabase.ts'
 import type { AdminUser } from '../lib/types.ts'
 
@@ -23,7 +24,8 @@ export default function Admin() {
   const [role, setRole] = useState<'user' | 'coach'>('coach')
   const [password, setPassword] = useState(randomPassword)
   const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [secret, setSecret] = useState<{ label: string; value: string } | null>(null)
+  const [copied, setCopied] = useState(false)
 
   const load = useCallback(async () => {
     const { data, error } = await call<{ users: AdminUser[] }>({ action: 'list' })
@@ -39,7 +41,8 @@ export default function Admin() {
     const { error } = await call({ action: 'create', username: name, role, password })
     setError(error ?? null)
     if (!error) {
-      setNotice(`Created ${name}. Give them this temporary password (shown once): ${password}`)
+      setSecret({ label: `Created ${name}. Temporary password, shown once:`, value: password })
+      setCopied(false)
       setUsername('')
       setPassword(randomPassword())
       await load()
@@ -50,7 +53,7 @@ export default function Admin() {
     const pw = randomPassword()
     const { error } = await call({ action: 'reset_password', id: u.id, password: pw })
     setError(error ?? null)
-    if (!error) setNotice(`New temporary password for ${u.username} (shown once): ${pw}`)
+    if (!error) { setSecret({ label: `New temporary password for ${u.username}, shown once:`, value: pw }); setCopied(false) }
   }
 
   async function setDisabled(u: AdminUser, disabled: boolean) {
@@ -66,55 +69,67 @@ export default function Admin() {
     await load()
   }
 
-  return (
-    <div className="narrow-block">
-      <h1>Accounts</h1>
-      {error && <p className="error" role="alert">{error}</p>}
-      {notice && <p className="ok">{notice}</p>}
+  async function copy(v: string) {
+    await navigator.clipboard.writeText(v).catch(() => undefined)
+    setCopied(true)
+  }
 
-      <section>
-        <h2>Create account</h2>
-        <form onSubmit={create} className="stack">
-          <label>
-            Username
-            <input value={username} onChange={(e) => setUsername(e.target.value)} pattern="[a-zA-Z0-9_]{3,24}" title="3-24 letters, digits or _" required />
+  return (
+    <>
+      <PageHeader title="Accounts" subtitle="Create and manage coach and user accounts. There is no public sign-up." />
+      {error && <Callout tone="error">{error}</Callout>}
+      {secret && (
+        <Callout tone="info">
+          <span>{secret.label}</span>
+          <code className="secret">{secret.value}</code>
+          <button className="btn" onClick={() => void copy(secret.value)}><Icon name="copy" size={14} />{copied ? 'Copied' : 'Copy'}</button>
+        </Callout>
+      )}
+
+      <Section title="Everyone">
+        {users === null ? <p className="sub">Loading…</p> : (
+          <div className="group">
+            {users.map((u) => (
+              <div className="row" key={u.id} style={{ flexWrap: 'wrap' }}>
+                <div className="row-main">
+                  <div className="row-title">{u.username}</div>
+                </div>
+                <div className="end">
+                  <RoleChip role={u.role} />
+                  {u.disabled && <span className="chip chip-off">disabled</span>}
+                </div>
+                {u.role !== 'admin' && (
+                  <div className="actions" style={{ width: '100%', margin: 0, paddingLeft: 0 }}>
+                    <button className="btn" onClick={() => void reset(u)}>Reset password</button>
+                    <button className="btn" onClick={() => void setDisabled(u, !u.disabled)}>{u.disabled ? 'Enable' : 'Disable'}</button>
+                    <button className="btn danger" onClick={() => void remove(u)}>Delete</button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
+
+      <Section title="New account">
+        <form onSubmit={create} className="form">
+          <label className="field">Username
+            <input value={username} onChange={(e) => setUsername(e.target.value)} pattern="[a-zA-Z0-9_]{3,24}" title="3 to 24 letters, digits or underscore" autoCapitalize="none" required />
           </label>
-          <label>
-            Role
+          <label className="field">Role
             <select value={role} onChange={(e) => setRole(e.target.value as 'user' | 'coach')}>
               <option value="coach">Coach</option>
               <option value="user">User</option>
             </select>
           </label>
-          <label>
-            Temporary password
-            <input value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} required />
+          <label className="field">Temporary password
+            <input value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} required style={{ fontFamily: 'var(--mono)' }} />
           </label>
-          <button className="primary">Create account</button>
+          <div className="actions" style={{ marginTop: 0 }}>
+            <button className="btn primary">Create account</button>
+          </div>
         </form>
-      </section>
-
-      <section>
-        <h2>Everyone</h2>
-        {users === null ? <p className="muted">Loading…</p> : (
-          <ul className="list">
-            {users.map((u) => (
-              <li key={u.id}>
-                <span>
-                  <strong>{u.username}</strong> <span className="muted">{u.role}{u.disabled ? ' · disabled' : ''}</span>
-                </span>
-                {u.role !== 'admin' && (
-                  <span className="row">
-                    <button onClick={() => void reset(u)}>Reset password</button>
-                    <button onClick={() => void setDisabled(u, !u.disabled)}>{u.disabled ? 'Enable' : 'Disable'}</button>
-                    <button onClick={() => void remove(u)}>Delete</button>
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </div>
+      </Section>
+    </>
   )
 }
