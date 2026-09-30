@@ -13,20 +13,22 @@ coach, and shared coaching sessions. Static SPA on GitHub Pages; Supabase
   only holds the public anon key. Admin actions go through the `admin-users` Edge
   Function, which holds the service-role key and checks the caller is an admin.
 
-## One-time setup
-1. Create a Supabase project. Auth → Providers → Email: **disable "Allow new users to sign up"**
-   and "Confirm email".
-2. Run `supabase/migrations/0001_init.sql` in the SQL editor.
-3. Create your admin: Auth → Users → Add user (email `<username>@league-helper.invalid`,
-   a password, auto-confirm), then in the SQL editor:
+## One-time setup (done for the live project)
+1. Create a Supabase project, then link it: `supabase link --project-ref <ref>`.
+2. Schema: `supabase db query --linked -f supabase/migrations/0001_init.sql`.
+3. Function: `supabase functions deploy admin-users --project-ref <ref>`.
+4. Auth config (sign-up off, site URL): `supabase config push --project-ref <ref>`
+   (`supabase/config.toml` declares only those settings).
+5. Admin user: create via the Auth admin API with email `<username>@league-helper.invalid`
+   (email_confirm true), then
    ```sql
    insert into profiles (id, username, role, must_change_password)
-   select id, '<username>', 'admin', false from auth.users where email = '<username>@league-helper.invalid';
+   select id, '<username>', 'admin', true from auth.users where email = '<username>@league-helper.invalid';
    ```
-4. Deploy the function: `supabase link --project-ref <ref> && supabase functions deploy admin-users`.
-5. GitHub repo → Settings → Pages → Source: **GitHub Actions**; Settings → Variables →
-   add `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (both public values).
-6. Supabase → Auth → URL config: add the Pages URL as a site URL.
+6. GitHub: Pages source = GitHub Actions; repo variables `VITE_SUPABASE_URL` and
+   `VITE_SUPABASE_ANON_KEY` (both public values).
+
+Live: https://nebuliftapp.github.io/league-helper-web/
 
 ## Develop
 ```sh

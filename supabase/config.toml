@@ -1,0 +1,6 @@
+# Only what we deliberately manage; `supabase config push` leaves undeclared settings alone.
+project_id = "league-helper-web"
+
+[auth]
+enable_signup = false
+site_url = "https://nebuliftapp.github.io/league-helper-web/"
